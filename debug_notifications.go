@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/j0r15/terraform-provider-uptimekuma/internal/provider"
+	"github.com/j0r15/uptime-kuma-terraform-provider/internal/provider"
 )
 
 func main() {

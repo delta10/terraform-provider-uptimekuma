@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/j0r15/terraform-provider-uptimekuma/internal/provider"
+	"github.com/j0r15/uptime-kuma-terraform-provider/internal/provider"
 )
 
 // Run "go generate" to format example terraform files and generate the docs for the registry/website

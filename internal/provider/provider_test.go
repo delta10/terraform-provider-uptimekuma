@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/j0r15/terraform-provider-uptimekuma/internal/provider"
+	"github.com/j0r15/uptime-kuma-terraform-provider/internal/provider"
 )
 
 // testAccProtoV6ProviderFactories are used to instantiate a provider during
