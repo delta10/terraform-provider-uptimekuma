@@ -1,3 +1,5 @@
+version: 2
+
 project_name: uptime-kuma-terraform-provider
 
 before:
@@ -29,7 +31,9 @@ builds:
     binary: '{{ .ProjectName }}_v{{ .Version }}'
 
 archives:
-  - format: zip
+  - files:
+      - README.md
+      - LICENSE
     # GitHub registry expects this naming convention
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
 
@@ -39,6 +43,7 @@ checksum:
 
 signs:
   - artifacts: checksum
+    cmd: gpg
     args:
       - "--batch"
       - "--local-user"
@@ -47,6 +52,7 @@ signs:
       - "${signature}"
       - "--detach-sign"
       - "${artifact}"
+    signature: "${artifact}.sig"
 
 release:
   draft: false
