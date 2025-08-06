@@ -1,0 +1,30 @@
+# Example terraform.tfvars file
+# Copy this file to terraform.tfvars and fill in your actual values
+
+# Uptime Kuma Server
+uptime_kuma_url      = "https://your-uptime-kuma.example.com"
+uptime_kuma_username = "admin"
+uptime_kuma_password = "your-secure-password"
+
+# Discord
+discord_webhook_url = "https://discord.com/api/webhooks/your-webhook-id/your-webhook-token"
+
+# Slack
+slack_webhook_url = "https://hooks.slack.com/services/your/slack/webhook"
+
+# Email (SMTP)
+smtp_host     = "smtp.gmail.com"
+smtp_username = "your-email@gmail.com"
+smtp_password = "your-app-password"
+email_from    = "alerts@your-domain.com"
+email_to      = "admin@your-domain.com"
+
+# Microsoft Teams
+teams_webhook_url = "https://your-organization.webhook.office.com/webhookb2/your-webhook-url"
+
+# PagerDuty
+pagerduty_integration_key = "your-pagerduty-integration-key"
+
+# API Authentication
+api_username = "api-user"
+api_password = "api-password"

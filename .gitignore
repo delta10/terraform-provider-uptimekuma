@@ -1,0 +1,28 @@
+# Terraform files
+*.tfstate
+*.tfstate.*
+*.tfvars.backup
+.terraform/
+.terraform.lock.hcl
+
+# Sensitive authentication files
+auth.tfvars
+secrets.tfvars
+*.auto.tfvars
+
+# Environment files
+.env
+.env.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+examples/multiple-hosts/terraform.tfvars
+test/terraform.tfvars
+terraform-provider-uptimekuma

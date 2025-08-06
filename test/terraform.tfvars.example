@@ -1,0 +1,36 @@
+# Example terraform.tfvars file
+# Copy this to terraform.tfvars and fill in your actual values
+
+# Telegram Configuration
+# 1. Create a bot by messaging @BotFather on Telegram
+# 2. Get your chat ID by messaging @userinfobot on Telegram
+telegram_bot_token = "YOUR_BOT_TOKEN_HERE"
+telegram_chat_id   = "YOUR_CHAT_ID_HERE"
+
+# Enable Telegram notifications (default: true)
+telegram_notification_enabled = true
+
+# Example monitored hosts
+monitored_hosts = [
+  {
+    name     = "Google"
+    url      = "https://google.com"
+    interval = 60
+    timeout  = 30
+    active   = true
+  },
+  {
+    name     = "GitHub"
+    url      = "https://github.com"
+    interval = 120
+    timeout  = 30
+    active   = true
+  },
+  {
+    name     = "Example API"
+    url      = "https://httpbin.org/status/200"
+    interval = 60
+    timeout  = 15
+    active   = true
+  }
+]

@@ -1,0 +1,14 @@
+# Uptime Kuma Authentication Configuration Template
+# 
+# 1. Copy this file to auth.tfvars:
+#    cp auth.tfvars.example auth.tfvars
+#
+# 2. Edit auth.tfvars with your actual credentials
+# 
+# 3. Make sure auth.tfvars is in .gitignore (it should be already)
+#
+# 4. Use with: tofu apply -var-file="auth.tfvars" -parallelism=1
+
+# Replace with your actual Uptime Kuma admin credentials
+uptime_kuma_username = "your-admin-username"
+uptime_kuma_password = "your-secure-password"

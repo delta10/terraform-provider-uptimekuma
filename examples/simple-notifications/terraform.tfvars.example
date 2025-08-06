@@ -1,0 +1,21 @@
+# Example values - copy to terraform.tfvars and fill in your details
+
+# Uptime Kuma server configuration
+uptime_kuma_url      = "https://your-uptime-kuma.example.com"
+uptime_kuma_username = "admin"
+uptime_kuma_password = "your-secure-password"
+
+# Discord webhook (optional)
+discord_webhook_url = "https://discord.com/api/webhooks/your-webhook-id/your-webhook-token"
+
+# Slack webhook (optional)
+slack_webhook_url = "https://hooks.slack.com/services/your/slack/webhook"
+
+# Email settings (optional)
+email_username = "your-email@gmail.com"
+email_password = "your-app-password"
+email_from     = "alerts@your-domain.com"
+email_to       = "admin@your-domain.com"
+
+# Generic webhook (optional)
+webhook_url = "https://your-webhook-endpoint.com/alerts"
