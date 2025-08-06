@@ -208,6 +208,29 @@ make install
 go test ./...
 ```
 
+## Github Release
+
+# Generate GPG key
+gpg --batch --full-generate-key <<EOF
+%no-protection
+Key-Type: 1
+Key-Length: 4096
+Subkey-Type: 1
+Subkey-Length: 4096
+Expire-Date: 0
+Name-Comment: terraform-provider-uptimekuma
+Name-Real: Your Name
+Name-Email: your.email@example.com
+EOF
+
+# Export keys
+gpg --armor --export-secret-keys your.email@example.com > private.key
+gpg --armor --export your.email@example.com > public.key
+
+Add to GitHub Secrets:
+GPG_PRIVATE_KEY: Content of private.key
+PASSPHRASE: Your GPG passphrase (if any)
+
 ## License
 
 EUPL License - see LICENSE file for details.
