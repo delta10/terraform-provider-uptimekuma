@@ -1,4 +1,4 @@
-module github.com/j0r15/uptime-kuma-terraform-provider
+module github.com/j0r15/terraform-provider-uptimekuma
 
 go 1.23.0
 

@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/j0r15/uptime-kuma-terraform-provider/internal/provider"
+	"github.com/j0r15/terraform-provider-uptimekuma/internal/provider"
 )
 
 func main() {
@@ -21,7 +21,7 @@ func main() {
 	defer client.Close()
 
 	fmt.Println("✅ Connected to Uptime Kuma")
-	
+
 	// Wait a bit for the notificationList event to be received
 	fmt.Println("⏳ Waiting for initial events...")
 	time.Sleep(3 * time.Second)

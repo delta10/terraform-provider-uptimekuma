@@ -9,8 +9,8 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 build: ## Build the provider
-	@echo "Building uptime-kuma-terraform-provider..."
-	go build -o uptime-kuma-terraform-provider
+	@echo "Building terraform-provider-uptimekuma..."
+	go build -o terraform-provider-uptimekuma
 
 test: ## Run tests
 	@echo "Running tests..."
@@ -22,14 +22,15 @@ test-acc: ## Run acceptance tests
 
 clean: ## Clean build artifacts
 	@echo "Cleaning..."
-	rm -f uptime-kuma-terraform-provider
+	rm -f terraform-provider-uptimekuma
 	rm -rf dist/
+	rm -rf ~/.terraform.d/plugins/j0r15.local/provider/uptimekuma/1.0.0/linux_amd64/
 	go clean
 
 install: build ## Build and install the provider locally
 	@echo "Installing provider locally..."
 	mkdir -p ~/.terraform.d/plugins/j0r15.local/provider/uptimekuma/1.0.0/linux_amd64/
-	cp uptime-kuma-terraform-provider ~/.terraform.d/plugins/j0r15.local/provider/uptimekuma/1.0.0/linux_amd64/
+	cp terraform-provider-uptimekuma ~/.terraform.d/plugins/j0r15.local/provider/uptimekuma/1.0.0/linux_amd64/
 
 fmt: ## Format Go code
 	@echo "Formatting code..."

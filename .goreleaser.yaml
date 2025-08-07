@@ -1,6 +1,6 @@
 version: 2
 
-project_name: uptime-kuma-terraform-provider
+project_name: terraform-provider-uptimekuma
 
 before:
   hooks:

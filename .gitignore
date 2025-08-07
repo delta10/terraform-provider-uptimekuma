@@ -26,4 +26,5 @@ Thumbs.db
 examples/multiple-hosts/terraform.tfvars
 test/terraform.tfvars
 terraform-provider-uptimekuma
-uptime-kuma-terraform-provider
+terraform-provider-uptimekuma
+test_slack/terraform.tfvars

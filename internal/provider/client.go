@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"strconv"
 
 	"github.com/gorilla/websocket"
 )
@@ -18,21 +18,21 @@ var globalWSMutex sync.Mutex
 
 // Client represents the Uptime Kuma API client
 type Client struct {
-	BaseURL       string
-	Username      string
-	Password      string
-	HTTPClient    *http.Client
-	wsConn        *websocket.Conn
-	connected     bool
-	mu            sync.RWMutex
-	wsMu          sync.Mutex // Protects WebSocket writes from concurrent access
-	eventID       int
-	responses     map[int]chan SocketResponse
-	respMu        sync.RWMutex
-	userID        int
-	token         string
-	monitors      map[string]interface{} // Cache for monitors from monitorList event
-	monitorsMu    sync.RWMutex
+	BaseURL           string
+	Username          string
+	Password          string
+	HTTPClient        *http.Client
+	wsConn            *websocket.Conn
+	connected         bool
+	mu                sync.RWMutex
+	wsMu              sync.Mutex // Protects WebSocket writes from concurrent access
+	eventID           int
+	responses         map[int]chan SocketResponse
+	respMu            sync.RWMutex
+	userID            int
+	token             string
+	monitors          map[string]interface{} // Cache for monitors from monitorList event
+	monitorsMu        sync.RWMutex
 	notificationCache []Notification // Cache for notifications from notificationList event
 	notificationsMu   sync.RWMutex
 }
@@ -55,30 +55,30 @@ type SocketResponse struct {
 
 // Monitor represents an Uptime Kuma monitor
 type Monitor struct {
-	ID                  int                    `json:"id,omitempty"`
-	Name                string                 `json:"name"`
-	Type                string                 `json:"type"`
-	URL                 string                 `json:"url,omitempty"`
-	Hostname            string                 `json:"hostname,omitempty"`
-	Port                int                    `json:"port,omitempty"`
-	Interval            int                    `json:"interval"`
-	Timeout             int                    `json:"timeout"`
-	RetryInterval       int                    `json:"retryInterval,omitempty"`
-	ResendInterval      int                    `json:"resendInterval,omitempty"`
-	MaxRetries          int                    `json:"maxretries,omitempty"`
-	UpsideDown          bool                   `json:"upsideDown,omitempty"`
-	MaxRedirects        int                    `json:"maxredirects,omitempty"`
-	AcceptedStatusCodes []string               `json:"accepted_statuscodes,omitempty"`
-	FollowRedirect      bool                   `json:"follow_redirect,omitempty"`
-	Tags                []string               `json:"tags,omitempty"`
-	NotificationIDList  []int                  `json:"notificationIDList,omitempty"`
-	Active              bool                   `json:"active"`
-	IgnoreTLS           bool                   `json:"ignoreTls,omitempty"`
-	HTTPMethod          string                 `json:"method,omitempty"`
-	Body                string                 `json:"body,omitempty"`
-	Headers             map[string]string      `json:"headers,omitempty"`
-	BasicAuthUser       string                 `json:"basic_auth_user,omitempty"`
-	BasicAuthPass       string                 `json:"basic_auth_pass,omitempty"`
+	ID                  int               `json:"id,omitempty"`
+	Name                string            `json:"name"`
+	Type                string            `json:"type"`
+	URL                 string            `json:"url,omitempty"`
+	Hostname            string            `json:"hostname,omitempty"`
+	Port                int               `json:"port,omitempty"`
+	Interval            int               `json:"interval"`
+	Timeout             int               `json:"timeout"`
+	RetryInterval       int               `json:"retryInterval,omitempty"`
+	ResendInterval      int               `json:"resendInterval,omitempty"`
+	MaxRetries          int               `json:"maxretries,omitempty"`
+	UpsideDown          bool              `json:"upsideDown,omitempty"`
+	MaxRedirects        int               `json:"maxredirects,omitempty"`
+	AcceptedStatusCodes []string          `json:"accepted_statuscodes,omitempty"`
+	FollowRedirect      bool              `json:"follow_redirect,omitempty"`
+	Tags                []string          `json:"tags,omitempty"`
+	NotificationIDList  []int             `json:"notificationIDList,omitempty"`
+	Active              bool              `json:"active"`
+	IgnoreTLS           bool              `json:"ignoreTls,omitempty"`
+	HTTPMethod          string            `json:"method,omitempty"`
+	Body                string            `json:"body,omitempty"`
+	Headers             map[string]string `json:"headers,omitempty"`
+	BasicAuthUser       string            `json:"basic_auth_user,omitempty"`
+	BasicAuthPass       string            `json:"basic_auth_pass,omitempty"`
 }
 
 // LoginRequest represents the login request payload
@@ -150,12 +150,12 @@ type NotificationCreateResponse struct {
 // NewClient creates a new Uptime Kuma API client
 func NewClient(baseURL, username, password string) (*Client, error) {
 	client := &Client{
-		BaseURL:       baseURL,
-		Username:      username,
-		Password:      password,
-		HTTPClient:    &http.Client{Timeout: 30 * time.Second},
-		responses:     make(map[int]chan SocketResponse),
-		monitors:      make(map[string]interface{}),
+		BaseURL:    baseURL,
+		Username:   username,
+		Password:   password,
+		HTTPClient: &http.Client{Timeout: 30 * time.Second},
+		responses:  make(map[int]chan SocketResponse),
+		monitors:   make(map[string]interface{}),
 	}
 
 	// Connect to Socket.IO endpoint
@@ -170,6 +170,9 @@ func NewClient(baseURL, username, password string) (*Client, error) {
 		client.disconnect()
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
+
+	// Wait a moment for the initial events to be received
+	time.Sleep(1 * time.Second)
 
 	return client, nil
 }
@@ -187,7 +190,7 @@ func (c *Client) connect() error {
 	if u.Scheme == "https" {
 		scheme = "wss"
 	}
-	
+
 	// Socket.IO WebSocket endpoint
 	wsURL := fmt.Sprintf("%s://%s/socket.io/?EIO=4&transport=websocket", scheme, u.Host)
 
@@ -222,7 +225,7 @@ func (c *Client) connect() error {
 func (c *Client) disconnect() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if c.wsConn != nil && c.connected {
 		c.wsConn.Close()
 		c.connected = false
@@ -265,11 +268,11 @@ func (c *Client) parseMessage(message string) {
 		if strings.HasPrefix(content, "3") {
 			// Callback response: 43[ack_id][response_data]
 			content = content[1:] // Remove "3"
-			
+
 			// Extract callback ID and response data
 			var callbackID int
 			var responseData string
-			
+
 			// Find where the JSON starts (after the callback ID)
 			for i := 0; i < len(content); i++ {
 				if content[i] == '[' || content[i] == '{' {
@@ -280,14 +283,14 @@ func (c *Client) parseMessage(message string) {
 					break
 				}
 			}
-			
+
 			// Parse response data - it should be a single JSON object, not an array
 			var responseObj interface{}
 			if err := json.Unmarshal([]byte(responseData), &responseObj); err == nil {
 				response := SocketResponse{
 					Data: []interface{}{responseObj}, // Wrap in array for consistent handling
 				}
-				
+
 				// Send to waiting goroutine
 				c.respMu.RLock()
 				if ch, exists := c.responses[callbackID]; exists {
@@ -306,7 +309,7 @@ func (c *Client) parseMessage(message string) {
 				if len(eventData) >= 2 {
 					event := eventData[0].(string)
 					data := eventData[1:]
-					
+
 					// Handle specific events we care about
 					if event == "monitorList" && len(data) > 0 {
 						// Cache the monitor list data
@@ -375,7 +378,7 @@ func (c *Client) login() error {
 			c.token = tokenStr
 		}
 	}
-	
+
 	// Store user ID - in Uptime Kuma, user ID is typically 1 for admin
 	// but we should check if it's provided in the response
 	if userID, exists := response["userID"]; exists {
@@ -390,36 +393,32 @@ func (c *Client) login() error {
 	return nil
 }
 
-// emit sends a Socket.IO event with acknowledgment but doesn't wait for response
+// emit sends a Socket.IO event without waiting for response (fire-and-forget)
 func (c *Client) emit(event string, data interface{}) error {
 	c.mu.Lock()
 	if !c.connected || c.wsConn == nil {
 		c.mu.Unlock()
 		return fmt.Errorf("not connected")
 	}
-	
-	// Get next event ID for acknowledgment
-	c.eventID++
-	eventID := c.eventID
-	
+
 	conn := c.wsConn
 	c.mu.Unlock()
 
-	// Create Socket.IO event message with acknowledgment: 42[ack_id]["event", data]
+	// Create Socket.IO event message without acknowledgment: 42["event", data]
 	eventData := []interface{}{event, data}
 	eventJSON, err := json.Marshal(eventData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal event data: %w", err)
 	}
 
-	// Socket.IO message format with acknowledgment: 42[ack_id][json_array]
-	message := fmt.Sprintf("42%d%s", eventID, string(eventJSON))
-	
+	// Socket.IO message format without acknowledgment: 42[json_array]
+	message := fmt.Sprintf("42%s", string(eventJSON))
+
 	// Use global mutex only for the WebSocket write operation
 	globalWSMutex.Lock()
 	err = conn.WriteMessage(websocket.TextMessage, []byte(message))
 	globalWSMutex.Unlock()
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
@@ -434,11 +433,11 @@ func (c *Client) call(event string, data interface{}) (map[string]interface{}, e
 		c.mu.Unlock()
 		return nil, fmt.Errorf("not connected")
 	}
-	
+
 	// Get next event ID for callback
 	c.eventID++
 	eventID := c.eventID
-	
+
 	// Create response channel
 	responseCh := make(chan SocketResponse, 1)
 	c.respMu.Lock()
@@ -466,21 +465,21 @@ func (c *Client) call(event string, data interface{}) (map[string]interface{}, e
 
 	// Socket.IO message format for binary events with acknowledgments: 42[ack_id][json_array]
 	message := fmt.Sprintf("42%d%s", eventID, string(eventJSON))
-	
+
 	// Use global mutex only for the WebSocket write operation
 	globalWSMutex.Lock()
 	err = conn.WriteMessage(websocket.TextMessage, []byte(message))
 	globalWSMutex.Unlock()
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to send message: %w", err)
-	}	// Wait for response with timeout
+	} // Wait for response with timeout
 	select {
 	case response := <-responseCh:
 		if response.Error != "" {
 			return nil, fmt.Errorf("server error: %s", response.Error)
 		}
-		
+
 		// Parse response data
 		if len(response.Data) > 0 {
 			if result, ok := response.Data[0].(map[string]interface{}); ok {
@@ -499,9 +498,9 @@ func (c *Client) call(event string, data interface{}) (map[string]interface{}, e
 				return result, nil
 			}
 		}
-		
+
 		return map[string]interface{}{}, nil
-		
+
 	case <-time.After(30 * time.Second):
 		return nil, fmt.Errorf("timeout waiting for response")
 	}
@@ -522,7 +521,7 @@ func (c *Client) GetMonitor(id int) (*Monitor, error) {
 			if monitorID, ok := monitorMap["id"].(float64); ok && int(monitorID) == id {
 				monitor := Monitor{}
 				monitor.ID = int(monitorID)
-				
+
 				// Parse basic fields
 				if name, ok := monitorMap["name"].(string); ok {
 					monitor.Name = name
@@ -542,7 +541,7 @@ func (c *Client) GetMonitor(id int) (*Monitor, error) {
 				if active, ok := monitorMap["active"].(float64); ok {
 					monitor.Active = active == 1
 				}
-				
+
 				// Parse notification_id_list
 				if notificationIDs, ok := monitorMap["notification_id_list"].([]interface{}); ok {
 					var ids []int
@@ -557,12 +556,12 @@ func (c *Client) GetMonitor(id int) (*Monitor, error) {
 					}
 					monitor.NotificationIDList = ids
 				}
-				
+
 				return &monitor, nil
 			}
 		}
 	}
-	
+
 	// Monitor not found in cache
 	return nil, fmt.Errorf("monitor with ID %d not found", id)
 }
@@ -576,16 +575,16 @@ func (c *Client) GetMonitors() ([]Monitor, error) {
 
 	// Parse the cached monitors into our Monitor struct
 	var monitors []Monitor
-	
+
 	for _, monitorDataInterface := range monitorData {
 		if monitorMap, ok := monitorDataInterface.(map[string]interface{}); ok {
 			monitor := Monitor{}
-			
+
 			// Parse ID
 			if id, ok := monitorMap["id"].(float64); ok {
 				monitor.ID = int(id)
 			}
-			
+
 			// Parse basic fields
 			if name, ok := monitorMap["name"].(string); ok {
 				monitor.Name = name
@@ -626,11 +625,11 @@ func (c *Client) GetMonitors() ([]Monitor, error) {
 			if upsideDown, ok := monitorMap["upsideDown"].(bool); ok {
 				monitor.UpsideDown = upsideDown
 			}
-			
+
 			monitors = append(monitors, monitor)
 		}
 	}
-	
+
 	return monitors, nil
 }
 
@@ -638,40 +637,40 @@ func (c *Client) GetMonitors() ([]Monitor, error) {
 func (c *Client) CreateMonitor(monitor *Monitor) (*Monitor, error) {
 	// Build monitor data in the format expected by Uptime Kuma
 	monitorData := map[string]interface{}{
-		"type":                monitor.Type,
-		"name":                monitor.Name,
-		"url":                 monitor.URL,
-		"hostname":            monitor.Hostname,
-		"port":                monitor.Port,
-		"interval":            monitor.Interval,
-		"timeout":             monitor.Timeout,
-		"retryInterval":       monitor.RetryInterval,
-		"resendInterval":      monitor.ResendInterval,
-		"maxretries":          monitor.MaxRetries,
-		"upsideDown":          monitor.UpsideDown,
-		"maxredirects":        monitor.MaxRedirects,
+		"type":                 monitor.Type,
+		"name":                 monitor.Name,
+		"url":                  monitor.URL,
+		"hostname":             monitor.Hostname,
+		"port":                 monitor.Port,
+		"interval":             monitor.Interval,
+		"timeout":              monitor.Timeout,
+		"retryInterval":        monitor.RetryInterval,
+		"resendInterval":       monitor.ResendInterval,
+		"maxretries":           monitor.MaxRetries,
+		"upsideDown":           monitor.UpsideDown,
+		"maxredirects":         monitor.MaxRedirects,
 		"accepted_statuscodes": []string{"200-299"}, // Ensure this is always an array
-		"method":              monitor.HTTPMethod,
-		"body":                monitor.Body,
-		"headers":             "",
-		"authMethod":          "",
-		"basic_auth_user":     monitor.BasicAuthUser,
-		"basic_auth_pass":     monitor.BasicAuthPass,
-		"ignoreTls":           monitor.IgnoreTLS,
-		"active":              monitor.Active,
-		"notificationIDList":  map[string]interface{}{}, // Use empty object like existing monitors
-		"httpBodyEncoding":    "json",
-		"expiryNotification":  false,
-		"dns_resolve_server":  "1.1.1.1",
-		"dns_resolve_type":    "A",
-		"proxyId":             nil,
-		"mqttUsername":        "",
-		"mqttPassword":        "",
-		"mqttTopic":           "",
-		"mqttSuccessMessage":  "",
-		"keyword":             "",
-		"invertKeyword":       false,
-		"packetSize":          56,
+		"method":               monitor.HTTPMethod,
+		"body":                 monitor.Body,
+		"headers":              "",
+		"authMethod":           "",
+		"basic_auth_user":      monitor.BasicAuthUser,
+		"basic_auth_pass":      monitor.BasicAuthPass,
+		"ignoreTls":            monitor.IgnoreTLS,
+		"active":               monitor.Active,
+		"notificationIDList":   map[string]interface{}{}, // Use empty object like existing monitors
+		"httpBodyEncoding":     "json",
+		"expiryNotification":   false,
+		"dns_resolve_server":   "1.1.1.1",
+		"dns_resolve_type":     "A",
+		"proxyId":              nil,
+		"mqttUsername":         "",
+		"mqttPassword":         "",
+		"mqttTopic":            "",
+		"mqttSuccessMessage":   "",
+		"keyword":              "",
+		"invertKeyword":        false,
+		"packetSize":           56,
 	}
 
 	// Add notification IDs if any are specified
@@ -709,13 +708,13 @@ func (c *Client) CreateMonitor(monitor *Monitor) (*Monitor, error) {
 	// Instead, we need to wait for the monitorList event and find the new monitor.
 	// For now, we'll wait a bit and then get the latest monitors to find our new one.
 	time.Sleep(1 * time.Second)
-	
+
 	// Refresh monitors from the latest monitorList event
 	monitors, err := c.GetMonitors()
 	if err != nil {
 		return monitor, nil // Return the monitor without ID rather than failing
 	}
-	
+
 	// Find the monitor we just created by name and URL (pick the one with highest ID)
 	maxID := 0
 	for _, m := range monitors {
@@ -723,11 +722,11 @@ func (c *Client) CreateMonitor(monitor *Monitor) (*Monitor, error) {
 			maxID = m.ID
 		}
 	}
-	
+
 	if maxID > 0 {
 		monitor.ID = maxID
 	}
-	
+
 	return monitor, nil
 }
 
@@ -735,41 +734,41 @@ func (c *Client) CreateMonitor(monitor *Monitor) (*Monitor, error) {
 func (c *Client) UpdateMonitor(monitor *Monitor) (*Monitor, error) {
 	// Build monitor data in the format expected by Uptime Kuma (same as create)
 	monitorData := map[string]interface{}{
-		"id":                  monitor.ID,
-		"type":                monitor.Type,
-		"name":                monitor.Name,
-		"url":                 monitor.URL,
-		"hostname":            monitor.Hostname,
-		"port":                monitor.Port,
-		"interval":            monitor.Interval,
-		"timeout":             monitor.Timeout,
-		"retryInterval":       monitor.RetryInterval,
-		"resendInterval":      monitor.ResendInterval,
-		"maxretries":          monitor.MaxRetries,
-		"upsideDown":          monitor.UpsideDown,
-		"maxredirects":        monitor.MaxRedirects,
+		"id":                   monitor.ID,
+		"type":                 monitor.Type,
+		"name":                 monitor.Name,
+		"url":                  monitor.URL,
+		"hostname":             monitor.Hostname,
+		"port":                 monitor.Port,
+		"interval":             monitor.Interval,
+		"timeout":              monitor.Timeout,
+		"retryInterval":        monitor.RetryInterval,
+		"resendInterval":       monitor.ResendInterval,
+		"maxretries":           monitor.MaxRetries,
+		"upsideDown":           monitor.UpsideDown,
+		"maxredirects":         monitor.MaxRedirects,
 		"accepted_statuscodes": []string{"200-299"}, // Ensure this is always an array
-		"method":              monitor.HTTPMethod,
-		"body":                monitor.Body,
-		"headers":             "",
-		"authMethod":          "",
-		"basic_auth_user":     monitor.BasicAuthUser,
-		"basic_auth_pass":     monitor.BasicAuthPass,
-		"ignoreTls":           monitor.IgnoreTLS,
-		"active":              monitor.Active,
-		"notificationIDList":  map[string]interface{}{}, // Use empty object like existing monitors
-		"httpBodyEncoding":    "json",
-		"expiryNotification":  false,
-		"dns_resolve_server":  "1.1.1.1",
-		"dns_resolve_type":    "A",
-		"proxyId":             nil,
-		"mqttUsername":        "",
-		"mqttPassword":        "",
-		"mqttTopic":           "",
-		"mqttSuccessMessage":  "",
-		"keyword":             "",
-		"invertKeyword":       false,
-		"packetSize":          56,
+		"method":               monitor.HTTPMethod,
+		"body":                 monitor.Body,
+		"headers":              "",
+		"authMethod":           "",
+		"basic_auth_user":      monitor.BasicAuthUser,
+		"basic_auth_pass":      monitor.BasicAuthPass,
+		"ignoreTls":            monitor.IgnoreTLS,
+		"active":               monitor.Active,
+		"notificationIDList":   map[string]interface{}{}, // Use empty object like existing monitors
+		"httpBodyEncoding":     "json",
+		"expiryNotification":   false,
+		"dns_resolve_server":   "1.1.1.1",
+		"dns_resolve_type":     "A",
+		"proxyId":              nil,
+		"mqttUsername":         "",
+		"mqttPassword":         "",
+		"mqttTopic":            "",
+		"mqttSuccessMessage":   "",
+		"keyword":              "",
+		"invertKeyword":        false,
+		"packetSize":           56,
 	}
 
 	// Add notification IDs if any are specified
@@ -819,20 +818,17 @@ func (c *Client) DeleteMonitor(id int) error {
 
 // GetNotifications retrieves all notifications from Uptime Kuma
 func (c *Client) GetNotifications() ([]Notification, error) {
-	// First check if we have cached notifications
+	// Use the cached notification data from the notificationList event
+	// Since we get this data automatically when connecting
 	c.notificationsMu.RLock()
 	cacheLength := len(c.notificationCache)
 	c.notificationsMu.RUnlock()
-	
+
 	// If cache is empty, wait a bit for the notificationList event
 	if cacheLength == 0 {
 		time.Sleep(2 * time.Second)
-		c.notificationsMu.RLock()
-		cacheLength = len(c.notificationCache)
-		c.notificationsMu.RUnlock()
 	}
-	
-	// Return the cached notification list from the notificationList event
+
 	c.notificationsMu.RLock()
 	notifications := make([]Notification, len(c.notificationCache))
 	copy(notifications, c.notificationCache)
@@ -844,7 +840,7 @@ func (c *Client) GetNotifications() ([]Notification, error) {
 // parseNotificationMap converts a map to a Notification struct
 func parseNotificationMap(notifMap map[string]interface{}) Notification {
 	notification := Notification{}
-	
+
 	if id, ok := notifMap["id"].(float64); ok {
 		notification.ID = int(id)
 	}
@@ -860,13 +856,13 @@ func parseNotificationMap(notifMap map[string]interface{}) Notification {
 	if isDefault, ok := notifMap["isDefault"].(bool); ok {
 		notification.IsDefault = isDefault
 	}
-	
+
 	// Handle config as JSON string
 	if configStr, ok := notifMap["config"].(string); ok {
 		var configMap map[string]interface{}
 		if err := json.Unmarshal([]byte(configStr), &configMap); err == nil {
 			notification.Config = configMap
-			
+
 			// Extract type and other fields from config
 			if notifType, exists := configMap["type"].(string); exists {
 				notification.Type = notifType
@@ -876,7 +872,7 @@ func parseNotificationMap(notifMap map[string]interface{}) Notification {
 			}
 		}
 	}
-	
+
 	return notification
 }
 
@@ -922,31 +918,31 @@ func (c *Client) CreateNotification(notification *Notification) (*Notification, 
 		}
 	}
 
-	// Use emit since addNotification might not expect a callback response
+	// Use emit since notification APIs don't support callbacks
 	err := c.emit("addNotification", notificationData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create notification: %w", err)
 	}
 
-	// Wait a bit for the notificationList event to be sent back
-	time.Sleep(1 * time.Second)
+	// Wait for the notificationList event to be updated
+	maxRetries := 10
+	for i := 0; i < maxRetries; i++ {
+		time.Sleep(500 * time.Millisecond)
 
-	// Find the created notification in the cache by name
-	c.notificationsMu.RLock()
-	var createdNotification *Notification
-	for _, notif := range c.notificationCache {
-		if notif.Name == notification.Name {
-			createdNotification = &notif
-			break
+		// Check if the notification appears in the cache
+		c.notificationsMu.RLock()
+		for _, notif := range c.notificationCache {
+			if notif.Name == notification.Name {
+				c.notificationsMu.RUnlock()
+				// Return a copy
+				result := notif
+				return &result, nil
+			}
 		}
-	}
-	c.notificationsMu.RUnlock()
-
-	if createdNotification == nil {
-		return nil, fmt.Errorf("notification was created but not found in cache")
+		c.notificationsMu.RUnlock()
 	}
 
-	return createdNotification, nil
+	return nil, fmt.Errorf("notification was created but not found in cache after %d retries", maxRetries)
 }
 
 // UpdateNotification updates an existing notification
@@ -967,43 +963,40 @@ func (c *Client) UpdateNotification(notification *Notification) (*Notification, 
 		}
 	}
 
-	// Use editNotification event for updates instead of addNotification
+	// Use emit for updates since notification APIs don't support callbacks
 	err := c.emit("editNotification", notificationData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update notification: %w", err)
 	}
 
-	// Wait a bit for the updated notificationList event
-	time.Sleep(1 * time.Second)
+	// Wait for the notificationList event to be updated
+	maxRetries := 10
+	for i := 0; i < maxRetries; i++ {
+		time.Sleep(500 * time.Millisecond)
 
-	// Find the updated notification in the cache
-	c.notificationsMu.RLock()
-	var updatedNotification *Notification
-	for _, notif := range c.notificationCache {
-		if notif.ID == notification.ID {
-			updatedNotification = &notif
-			break
+		// Check if the notification is updated in the cache
+		c.notificationsMu.RLock()
+		for _, notif := range c.notificationCache {
+			if notif.ID == notification.ID {
+				c.notificationsMu.RUnlock()
+				// Return a copy
+				result := notif
+				return &result, nil
+			}
 		}
-	}
-	c.notificationsMu.RUnlock()
-
-	if updatedNotification == nil {
-		return nil, fmt.Errorf("notification was updated but not found in cache")
+		c.notificationsMu.RUnlock()
 	}
 
-	return updatedNotification, nil
+	return nil, fmt.Errorf("notification was updated but not found in cache after %d retries", maxRetries)
 }
 
 // DeleteNotification deletes a notification
 func (c *Client) DeleteNotification(id int) error {
-	// Use emit for deleteNotification
+	// Use emit for deleteNotification since notification APIs don't support callbacks
 	err := c.emit("deleteNotification", id)
 	if err != nil {
 		return fmt.Errorf("failed to delete notification: %w", err)
 	}
-
-	// Wait a bit for the updated notificationList event
-	time.Sleep(1 * time.Second)
 
 	return nil
 }
@@ -1025,7 +1018,7 @@ func (c *Client) TestNotification(notification *Notification) error {
 		}
 	}
 
-	_, err := c.call("testNotification", testData)
+	err := c.emit("testNotification", testData)
 	if err != nil {
 		return fmt.Errorf("failed to test notification: %w", err)
 	}
