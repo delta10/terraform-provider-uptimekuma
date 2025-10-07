@@ -802,6 +802,9 @@ func (c *Client) UpdateMonitor(monitor *Monitor) (*Monitor, error) {
 		return nil, fmt.Errorf("failed to update monitor: %w", err)
 	}
 
+	// Wait for the monitorList event to be updated (similar to create)
+	time.Sleep(500 * time.Millisecond)
+
 	return monitor, nil
 }
 

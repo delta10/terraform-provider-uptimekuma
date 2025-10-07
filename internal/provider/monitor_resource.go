@@ -335,9 +335,24 @@ func (r *MonitorResource) Read(ctx context.Context, req resource.ReadRequest, re
 		for i, id := range monitor.NotificationIDList {
 			notificationIDs[i] = strconv.Itoa(id)
 		}
-		data.NotificationIDList, _ = types.ListValueFrom(ctx, types.StringType, notificationIDs)
+		listValue, diags := types.ListValueFrom(ctx, types.StringType, notificationIDs)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		data.NotificationIDList = listValue
 	} else {
-		data.NotificationIDList = types.ListNull(types.StringType)
+		// If the plan has an empty list (not null), preserve it as empty list
+		if !data.NotificationIDList.IsNull() && !data.NotificationIDList.IsUnknown() {
+			emptyList, diags := types.ListValueFrom(ctx, types.StringType, []string{})
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			data.NotificationIDList = emptyList
+		} else {
+			data.NotificationIDList = types.ListNull(types.StringType)
+		}
 	}
 
 	// Save updated data into Terraform state
@@ -413,6 +428,60 @@ func (r *MonitorResource) Update(ctx context.Context, req resource.UpdateRequest
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update monitor, got error: %s", err))
 		return
+	}
+
+	// Read back the monitor from the server to ensure state is accurate
+	updatedMonitor, err := r.client.GetMonitor(id)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read monitor after update, got error: %s", err))
+		return
+	}
+
+	// Update the model with the actual server state
+	data.Name = types.StringValue(updatedMonitor.Name)
+	data.Type = types.StringValue(updatedMonitor.Type)
+	data.URL = types.StringValue(updatedMonitor.URL)
+	data.Hostname = types.StringValue(updatedMonitor.Hostname)
+	data.Port = types.Int64Value(int64(updatedMonitor.Port))
+	data.Interval = types.Int64Value(int64(updatedMonitor.Interval))
+	data.Timeout = types.Int64Value(int64(updatedMonitor.Timeout))
+	data.RetryInterval = types.Int64Value(int64(updatedMonitor.RetryInterval))
+	data.ResendInterval = types.Int64Value(int64(updatedMonitor.ResendInterval))
+	data.MaxRetries = types.Int64Value(int64(updatedMonitor.MaxRetries))
+	data.UpsideDown = types.BoolValue(updatedMonitor.UpsideDown)
+	data.MaxRedirects = types.Int64Value(int64(updatedMonitor.MaxRedirects))
+	data.FollowRedirect = types.BoolValue(updatedMonitor.FollowRedirect)
+	data.Active = types.BoolValue(updatedMonitor.Active)
+	data.IgnoreTLS = types.BoolValue(updatedMonitor.IgnoreTLS)
+	data.HTTPMethod = types.StringValue(updatedMonitor.HTTPMethod)
+	data.Body = types.StringValue(updatedMonitor.Body)
+	data.BasicAuthUser = types.StringValue(updatedMonitor.BasicAuthUser)
+	data.BasicAuthPass = types.StringValue(updatedMonitor.BasicAuthPass)
+
+	// Convert notification IDs to string list
+	if len(updatedMonitor.NotificationIDList) > 0 {
+		notificationIDs := make([]string, len(updatedMonitor.NotificationIDList))
+		for i, notifID := range updatedMonitor.NotificationIDList {
+			notificationIDs[i] = strconv.Itoa(notifID)
+		}
+		listValue, diags := types.ListValueFrom(ctx, types.StringType, notificationIDs)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		data.NotificationIDList = listValue
+	} else {
+		// If the plan has an empty list (not null), preserve it as empty list
+		if !data.NotificationIDList.IsNull() && !data.NotificationIDList.IsUnknown() {
+			emptyList, diags := types.ListValueFrom(ctx, types.StringType, []string{})
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			data.NotificationIDList = emptyList
+		} else {
+			data.NotificationIDList = types.ListNull(types.StringType)
+		}
 	}
 
 	// Write logs using the tflog package

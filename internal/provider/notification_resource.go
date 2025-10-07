@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -184,6 +185,11 @@ func (r *NotificationResource) Read(ctx context.Context, req resource.ReadReques
 	// Get notification from API
 	notification, err := r.client.GetNotification(id)
 	if err != nil {
+		// If the notification is not found, remove it from state (Terraform will recreate it)
+		if strings.Contains(err.Error(), "not found") {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read notification, got error: %s", err))
 		return
 	}
