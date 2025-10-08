@@ -698,33 +698,37 @@ func (c *Client) CreateMonitor(monitor *Monitor) (*Monitor, error) {
 		}
 	}
 
-	// Call the "add" API endpoint
-	err := c.emit("add", monitorData)
+	// Call the "add" API endpoint and wait for response
+	response, err := c.call("add", monitorData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create monitor: %w", err)
 	}
 
-	// The add API typically doesn't return the monitor ID directly.
-	// Instead, we need to wait for the monitorList event and find the new monitor.
-	// For now, we'll wait a bit and then get the latest monitors to find our new one.
-	time.Sleep(1 * time.Second)
-
-	// Refresh monitors from the latest monitorList event
-	monitors, err := c.GetMonitors()
-	if err != nil {
-		return monitor, nil // Return the monitor without ID rather than failing
-	}
-
-	// Find the monitor we just created by name and URL (pick the one with highest ID)
-	maxID := 0
-	for _, m := range monitors {
-		if m.Name == monitor.Name && m.URL == monitor.URL && m.ID > maxID {
-			maxID = m.ID
+	// Extract monitor ID from response
+	if monitorID, ok := response["monitorID"].(float64); ok {
+		monitor.ID = int(monitorID)
+	} else if msgData, ok := response["msg"].(map[string]interface{}); ok {
+		// Some responses nest the ID in a msg object
+		if monitorID, ok := msgData["monitorID"].(float64); ok {
+			monitor.ID = int(monitorID)
 		}
 	}
 
-	if maxID > 0 {
-		monitor.ID = maxID
+	// If we still don't have an ID, try to find it from the cache as fallback
+	if monitor.ID == 0 {
+		time.Sleep(500 * time.Millisecond)
+		monitors, err := c.GetMonitors()
+		if err == nil {
+			maxID := 0
+			for _, m := range monitors {
+				if m.Name == monitor.Name && m.URL == monitor.URL && m.ID > maxID {
+					maxID = m.ID
+				}
+			}
+			if maxID > 0 {
+				monitor.ID = maxID
+			}
+		}
 	}
 
 	return monitor, nil

@@ -269,8 +269,41 @@ func (r *MonitorResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	// Update the model with the created monitor data
+	// Update the model with the created monitor ID
 	data.ID = types.StringValue(strconv.Itoa(createdMonitor.ID))
+
+	// Read back the monitor from the server to ensure notification IDs are accurate
+	actualMonitor, err := r.client.GetMonitor(createdMonitor.ID)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read monitor after creation, got error: %s", err))
+		return
+	}
+
+	// Convert notification IDs to string list from the actual server state
+	if len(actualMonitor.NotificationIDList) > 0 {
+		notificationIDs := make([]string, len(actualMonitor.NotificationIDList))
+		for i, id := range actualMonitor.NotificationIDList {
+			notificationIDs[i] = strconv.Itoa(id)
+		}
+		listValue, diags := types.ListValueFrom(ctx, types.StringType, notificationIDs)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		data.NotificationIDList = listValue
+	} else {
+		// If the plan has an empty list (not null), preserve it as empty list
+		if !data.NotificationIDList.IsNull() && !data.NotificationIDList.IsUnknown() {
+			emptyList, diags := types.ListValueFrom(ctx, types.StringType, []string{})
+			resp.Diagnostics.Append(diags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			data.NotificationIDList = emptyList
+		} else {
+			data.NotificationIDList = types.ListNull(types.StringType)
+		}
+	}
 
 	// Write logs using the tflog package
 	tflog.Trace(ctx, "created a monitor resource")
