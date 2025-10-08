@@ -1,12 +1,22 @@
 SHELL := /bin/bash
 
-.PHONY: help build test clean install fmt vet
+# Read version from VERSION file
+VERSION := $(shell cat VERSION 2>/dev/null || echo "1.0.0")
+PROVIDER_HOSTNAME := ansible.local
+PROVIDER_NAMESPACE := provider
+PROVIDER_NAME := uptimekuma
+PROVIDER_PATH := ~/.terraform.d/plugins/$(PROVIDER_HOSTNAME)/$(PROVIDER_NAMESPACE)/$(PROVIDER_NAME)/$(VERSION)/linux_amd64
+
+.PHONY: help version build test clean install fmt vet
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
 	@echo ''
 	@echo 'Targets:'
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+version: ## Show current version
+	@echo "$(VERSION)"
 
 build: ## Build the provider
 	@echo "Building terraform-provider-uptimekuma..."
@@ -24,13 +34,13 @@ clean: ## Clean build artifacts
 	@echo "Cleaning..."
 	rm -f terraform-provider-uptimekuma
 	rm -rf dist/
-	rm -rf ~/.terraform.d/plugins/ansible.local/provider/uptimekuma/1.0.1/linux_amd64/
+	rm -rf $(PROVIDER_PATH)
 	go clean
 
 install: build ## Build and install the provider locally
-	@echo "Installing provider locally..."
-	mkdir -p ~/.terraform.d/plugins/ansible.local/provider/uptimekuma/1.0.1/linux_amd64/
-	cp terraform-provider-uptimekuma ~/.terraform.d/plugins/ansible.local/provider/uptimekuma/1.0.1/linux_amd64/
+	@echo "Installing provider locally (version $(VERSION))..."
+	mkdir -p $(PROVIDER_PATH)
+	cp terraform-provider-uptimekuma $(PROVIDER_PATH)/
 
 fmt: ## Format Go code
 	@echo "Formatting code..."
