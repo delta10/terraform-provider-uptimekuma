@@ -216,6 +216,21 @@ func (r *MonitorResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	// Check if a monitor with this name already exists
+	existingMonitors, err := r.client.GetMonitors()
+	if err != nil {
+		tflog.Warn(ctx, fmt.Sprintf("Unable to check for existing monitors: %s", err))
+	}
+
+	var existingMonitor *Monitor
+	for i := range existingMonitors {
+		if existingMonitors[i].Name == data.Name.ValueString() {
+			existingMonitor = &existingMonitors[i]
+			tflog.Info(ctx, fmt.Sprintf("Found existing monitor with name '%s' and ID %d, adopting it", existingMonitor.Name, existingMonitor.ID))
+			break
+		}
+	}
+
 	// Convert Terraform model to API model
 	monitor := &Monitor{
 		Name:           data.Name.ValueString(),
@@ -262,48 +277,31 @@ func (r *MonitorResource) Create(ctx context.Context, req resource.CreateRequest
 		}
 	}
 
-	// Create monitor
-	createdMonitor, err := r.client.CreateMonitor(monitor)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create monitor, got error: %s", err))
-		return
+	var createdMonitor *Monitor
+	if existingMonitor != nil {
+		// Adopt the existing monitor and update it
+		monitor.ID = existingMonitor.ID
+		createdMonitor, err = r.client.UpdateMonitor(monitor)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update existing monitor, got error: %s", err))
+			return
+		}
+		tflog.Info(ctx, fmt.Sprintf("Adopted and updated existing monitor with ID %d", existingMonitor.ID))
+	} else {
+		// Create new monitor
+		createdMonitor, err = r.client.CreateMonitor(monitor)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create monitor, got error: %s", err))
+			return
+		}
+		tflog.Info(ctx, fmt.Sprintf("Created new monitor with ID %d", createdMonitor.ID))
 	}
 
 	// Update the model with the created monitor ID
 	data.ID = types.StringValue(strconv.Itoa(createdMonitor.ID))
 
-	// Read back the monitor from the server to ensure notification IDs are accurate
-	actualMonitor, err := r.client.GetMonitor(createdMonitor.ID)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read monitor after creation, got error: %s", err))
-		return
-	}
-
-	// Convert notification IDs to string list from the actual server state
-	if len(actualMonitor.NotificationIDList) > 0 {
-		notificationIDs := make([]string, len(actualMonitor.NotificationIDList))
-		for i, id := range actualMonitor.NotificationIDList {
-			notificationIDs[i] = strconv.Itoa(id)
-		}
-		listValue, diags := types.ListValueFrom(ctx, types.StringType, notificationIDs)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		data.NotificationIDList = listValue
-	} else {
-		// If the plan has an empty list (not null), preserve it as empty list
-		if !data.NotificationIDList.IsNull() && !data.NotificationIDList.IsUnknown() {
-			emptyList, diags := types.ListValueFrom(ctx, types.StringType, []string{})
-			resp.Diagnostics.Append(diags...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-			data.NotificationIDList = emptyList
-		} else {
-			data.NotificationIDList = types.ListNull(types.StringType)
-		}
-	}
+	// Don't read back from server - preserve plan values to avoid inconsistent state errors
+	// The state should reflect what we sent to the API
 
 	// Write logs using the tflog package
 	tflog.Trace(ctx, "created a monitor resource")
@@ -341,26 +339,51 @@ func (r *MonitorResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	// Update model with current state
+	// Update model with current state - only set values that are non-zero/non-empty
+	// to preserve null values for optional fields
 	data.Name = types.StringValue(monitor.Name)
 	data.Type = types.StringValue(monitor.Type)
-	data.URL = types.StringValue(monitor.URL)
-	data.Hostname = types.StringValue(monitor.Hostname)
-	data.Port = types.Int64Value(int64(monitor.Port))
+
+	if monitor.URL != "" {
+		data.URL = types.StringValue(monitor.URL)
+	}
+	if monitor.Hostname != "" {
+		data.Hostname = types.StringValue(monitor.Hostname)
+	}
+	if monitor.Port != 0 {
+		data.Port = types.Int64Value(int64(monitor.Port))
+	}
+
 	data.Interval = types.Int64Value(int64(monitor.Interval))
 	data.Timeout = types.Int64Value(int64(monitor.Timeout))
 	data.RetryInterval = types.Int64Value(int64(monitor.RetryInterval))
 	data.ResendInterval = types.Int64Value(int64(monitor.ResendInterval))
 	data.MaxRetries = types.Int64Value(int64(monitor.MaxRetries))
-	data.UpsideDown = types.BoolValue(monitor.UpsideDown)
 	data.MaxRedirects = types.Int64Value(int64(monitor.MaxRedirects))
-	data.FollowRedirect = types.BoolValue(monitor.FollowRedirect)
 	data.Active = types.BoolValue(monitor.Active)
-	data.IgnoreTLS = types.BoolValue(monitor.IgnoreTLS)
+
+	// Only set boolean fields if they were set in the config
+	if !data.UpsideDown.IsNull() {
+		data.UpsideDown = types.BoolValue(monitor.UpsideDown)
+	}
+	if !data.FollowRedirect.IsNull() {
+		data.FollowRedirect = types.BoolValue(monitor.FollowRedirect)
+	}
+	if !data.IgnoreTLS.IsNull() {
+		data.IgnoreTLS = types.BoolValue(monitor.IgnoreTLS)
+	}
+
 	data.HTTPMethod = types.StringValue(monitor.HTTPMethod)
-	data.Body = types.StringValue(monitor.Body)
-	data.BasicAuthUser = types.StringValue(monitor.BasicAuthUser)
-	data.BasicAuthPass = types.StringValue(monitor.BasicAuthPass)
+
+	if monitor.Body != "" {
+		data.Body = types.StringValue(monitor.Body)
+	}
+	if monitor.BasicAuthUser != "" {
+		data.BasicAuthUser = types.StringValue(monitor.BasicAuthUser)
+	}
+	if monitor.BasicAuthPass != "" {
+		data.BasicAuthPass = types.StringValue(monitor.BasicAuthPass)
+	}
 
 	// Convert notification IDs to string list
 	if len(monitor.NotificationIDList) > 0 {
@@ -463,59 +486,8 @@ func (r *MonitorResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	// Read back the monitor from the server to ensure state is accurate
-	updatedMonitor, err := r.client.GetMonitor(id)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read monitor after update, got error: %s", err))
-		return
-	}
-
-	// Update the model with the actual server state
-	data.Name = types.StringValue(updatedMonitor.Name)
-	data.Type = types.StringValue(updatedMonitor.Type)
-	data.URL = types.StringValue(updatedMonitor.URL)
-	data.Hostname = types.StringValue(updatedMonitor.Hostname)
-	data.Port = types.Int64Value(int64(updatedMonitor.Port))
-	data.Interval = types.Int64Value(int64(updatedMonitor.Interval))
-	data.Timeout = types.Int64Value(int64(updatedMonitor.Timeout))
-	data.RetryInterval = types.Int64Value(int64(updatedMonitor.RetryInterval))
-	data.ResendInterval = types.Int64Value(int64(updatedMonitor.ResendInterval))
-	data.MaxRetries = types.Int64Value(int64(updatedMonitor.MaxRetries))
-	data.UpsideDown = types.BoolValue(updatedMonitor.UpsideDown)
-	data.MaxRedirects = types.Int64Value(int64(updatedMonitor.MaxRedirects))
-	data.FollowRedirect = types.BoolValue(updatedMonitor.FollowRedirect)
-	data.Active = types.BoolValue(updatedMonitor.Active)
-	data.IgnoreTLS = types.BoolValue(updatedMonitor.IgnoreTLS)
-	data.HTTPMethod = types.StringValue(updatedMonitor.HTTPMethod)
-	data.Body = types.StringValue(updatedMonitor.Body)
-	data.BasicAuthUser = types.StringValue(updatedMonitor.BasicAuthUser)
-	data.BasicAuthPass = types.StringValue(updatedMonitor.BasicAuthPass)
-
-	// Convert notification IDs to string list
-	if len(updatedMonitor.NotificationIDList) > 0 {
-		notificationIDs := make([]string, len(updatedMonitor.NotificationIDList))
-		for i, notifID := range updatedMonitor.NotificationIDList {
-			notificationIDs[i] = strconv.Itoa(notifID)
-		}
-		listValue, diags := types.ListValueFrom(ctx, types.StringType, notificationIDs)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		data.NotificationIDList = listValue
-	} else {
-		// If the plan has an empty list (not null), preserve it as empty list
-		if !data.NotificationIDList.IsNull() && !data.NotificationIDList.IsUnknown() {
-			emptyList, diags := types.ListValueFrom(ctx, types.StringType, []string{})
-			resp.Diagnostics.Append(diags...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-			data.NotificationIDList = emptyList
-		} else {
-			data.NotificationIDList = types.ListNull(types.StringType)
-		}
-	}
+	// Don't read back from server - preserve plan values to avoid inconsistent state errors
+	// The state should reflect what we sent to the API
 
 	// Write logs using the tflog package
 	tflog.Trace(ctx, "updated a monitor resource")

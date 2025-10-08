@@ -126,6 +126,21 @@ func (r *NotificationResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
+	// Check if a notification with this name already exists
+	existingNotifications, err := r.client.GetNotifications()
+	if err != nil {
+		resp.Diagnostics.AddWarning("Warning", fmt.Sprintf("Unable to check for existing notifications: %s", err))
+	}
+
+	var existingNotification *Notification
+	for i := range existingNotifications {
+		if existingNotifications[i].Name == data.Name.ValueString() {
+			existingNotification = &existingNotifications[i]
+			resp.Diagnostics.AddWarning("Adopting Resource", fmt.Sprintf("Found existing notification with name '%s' and ID %d, adopting it", existingNotification.Name, existingNotification.ID))
+			break
+		}
+	}
+
 	// Convert config map to interface map
 	config := make(map[string]interface{})
 	if !data.Config.IsNull() && !data.Config.IsUnknown() {
@@ -150,11 +165,22 @@ func (r *NotificationResource) Create(ctx context.Context, req resource.CreateRe
 		Config:        config,
 	}
 
-	// Create notification via API
-	createdNotification, err := r.client.CreateNotification(notification)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create notification, got error: %s", err))
-		return
+	var createdNotification *Notification
+	if existingNotification != nil {
+		// Adopt the existing notification and update it
+		notification.ID = existingNotification.ID
+		createdNotification, err = r.client.UpdateNotification(notification)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update existing notification, got error: %s", err))
+			return
+		}
+	} else {
+		// Create notification via API
+		createdNotification, err = r.client.CreateNotification(notification)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create notification, got error: %s", err))
+			return
+		}
 	}
 
 	// Update the data model with response values

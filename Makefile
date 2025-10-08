@@ -24,13 +24,13 @@ clean: ## Clean build artifacts
 	@echo "Cleaning..."
 	rm -f terraform-provider-uptimekuma
 	rm -rf dist/
-	rm -rf ~/.terraform.d/plugins/j0r15.local/provider/uptimekuma/1.0.0/linux_amd64/
+	rm -rf ~/.terraform.d/plugins/ansible.local/provider/uptimekuma/1.0.1/linux_amd64/
 	go clean
 
 install: build ## Build and install the provider locally
 	@echo "Installing provider locally..."
-	mkdir -p ~/.terraform.d/plugins/j0r15.local/provider/uptimekuma/1.0.0/linux_amd64/
-	cp terraform-provider-uptimekuma ~/.terraform.d/plugins/j0r15.local/provider/uptimekuma/1.0.0/linux_amd64/
+	mkdir -p ~/.terraform.d/plugins/ansible.local/provider/uptimekuma/1.0.1/linux_amd64/
+	cp terraform-provider-uptimekuma ~/.terraform.d/plugins/ansible.local/provider/uptimekuma/1.0.1/linux_amd64/
 
 fmt: ## Format Go code
 	@echo "Formatting code..."

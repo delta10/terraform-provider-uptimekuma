@@ -532,14 +532,58 @@ func (c *Client) GetMonitor(id int) (*Monitor, error) {
 				if url, ok := monitorMap["url"].(string); ok {
 					monitor.URL = url
 				}
+				if hostname, ok := monitorMap["hostname"].(string); ok {
+					monitor.Hostname = hostname
+				}
+				if port, ok := monitorMap["port"].(float64); ok {
+					monitor.Port = int(port)
+				}
 				if interval, ok := monitorMap["interval"].(float64); ok {
 					monitor.Interval = int(interval)
 				}
 				if timeout, ok := monitorMap["timeout"].(float64); ok {
 					monitor.Timeout = int(timeout)
 				}
-				if active, ok := monitorMap["active"].(float64); ok {
+				if retryInterval, ok := monitorMap["retryInterval"].(float64); ok {
+					monitor.RetryInterval = int(retryInterval)
+				}
+				if resendInterval, ok := monitorMap["resendInterval"].(float64); ok {
+					monitor.ResendInterval = int(resendInterval)
+				}
+				if maxretries, ok := monitorMap["maxretries"].(float64); ok {
+					monitor.MaxRetries = int(maxretries)
+				}
+				if maxredirects, ok := monitorMap["maxredirects"].(float64); ok {
+					monitor.MaxRedirects = int(maxredirects)
+				}
+
+				// Parse boolean fields - try both bool and float64 (0/1)
+				if active, ok := monitorMap["active"].(bool); ok {
+					monitor.Active = active
+				} else if active, ok := monitorMap["active"].(float64); ok {
 					monitor.Active = active == 1
+				}
+				if ignoreTls, ok := monitorMap["ignoreTls"].(bool); ok {
+					monitor.IgnoreTLS = ignoreTls
+				}
+				if upsideDown, ok := monitorMap["upsideDown"].(bool); ok {
+					monitor.UpsideDown = upsideDown
+				}
+				if followRedirect, ok := monitorMap["follow_redirect"].(bool); ok {
+					monitor.FollowRedirect = followRedirect
+				}
+
+				if method, ok := monitorMap["method"].(string); ok {
+					monitor.HTTPMethod = method
+				}
+				if body, ok := monitorMap["body"].(string); ok {
+					monitor.Body = body
+				}
+				if basicAuthUser, ok := monitorMap["basic_auth_user"].(string); ok {
+					monitor.BasicAuthUser = basicAuthUser
+				}
+				if basicAuthPass, ok := monitorMap["basic_auth_pass"].(string); ok {
+					monitor.BasicAuthPass = basicAuthPass
 				}
 
 				// Parse notification_id_list
@@ -566,8 +610,28 @@ func (c *Client) GetMonitor(id int) (*Monitor, error) {
 	return nil, fmt.Errorf("monitor with ID %d not found", id)
 }
 
+// RefreshMonitors requests fresh monitor list from the server
+func (c *Client) RefreshMonitors() error {
+	// Request monitor list via Socket.IO
+	err := c.emit("getMonitorList", nil)
+	if err != nil {
+		return fmt.Errorf("failed to request monitor list: %w", err)
+	}
+
+	// Wait for the monitorList event to update the cache
+	time.Sleep(1 * time.Second)
+
+	return nil
+}
+
 // GetMonitors retrieves all monitors
 func (c *Client) GetMonitors() ([]Monitor, error) {
+	// Force refresh to get latest data
+	err := c.RefreshMonitors()
+	if err != nil {
+		return nil, fmt.Errorf("failed to refresh monitors: %w", err)
+	}
+
 	// Use cached monitor data from the monitorList event
 	c.monitorsMu.RLock()
 	monitorData := c.monitors
@@ -595,6 +659,12 @@ func (c *Client) GetMonitors() ([]Monitor, error) {
 			if url, ok := monitorMap["url"].(string); ok {
 				monitor.URL = url
 			}
+			if hostname, ok := monitorMap["hostname"].(string); ok {
+				monitor.Hostname = hostname
+			}
+			if port, ok := monitorMap["port"].(float64); ok {
+				monitor.Port = int(port)
+			}
 			if interval, ok := monitorMap["interval"].(float64); ok {
 				monitor.Interval = int(interval)
 			}
@@ -603,6 +673,8 @@ func (c *Client) GetMonitors() ([]Monitor, error) {
 			}
 			if active, ok := monitorMap["active"].(bool); ok {
 				monitor.Active = active
+			} else if active, ok := monitorMap["active"].(float64); ok {
+				monitor.Active = active == 1
 			}
 			if method, ok := monitorMap["method"].(string); ok {
 				monitor.HTTPMethod = method
@@ -624,6 +696,18 @@ func (c *Client) GetMonitors() ([]Monitor, error) {
 			}
 			if upsideDown, ok := monitorMap["upsideDown"].(bool); ok {
 				monitor.UpsideDown = upsideDown
+			}
+			if followRedirect, ok := monitorMap["follow_redirect"].(bool); ok {
+				monitor.FollowRedirect = followRedirect
+			}
+			if body, ok := monitorMap["body"].(string); ok {
+				monitor.Body = body
+			}
+			if basicAuthUser, ok := monitorMap["basic_auth_user"].(string); ok {
+				monitor.BasicAuthUser = basicAuthUser
+			}
+			if basicAuthPass, ok := monitorMap["basic_auth_pass"].(string); ok {
+				monitor.BasicAuthPass = basicAuthPass
 			}
 
 			monitors = append(monitors, monitor)
@@ -823,17 +907,26 @@ func (c *Client) DeleteMonitor(id int) error {
 	return nil
 }
 
+// RefreshNotifications requests fresh notification list from the server
+func (c *Client) RefreshNotifications() error {
+	// Request notification list via Socket.IO
+	err := c.emit("getNotificationList", nil)
+	if err != nil {
+		return fmt.Errorf("failed to request notification list: %w", err)
+	}
+
+	// Wait for the notificationList event to update the cache
+	time.Sleep(1 * time.Second)
+
+	return nil
+}
+
 // GetNotifications retrieves all notifications from Uptime Kuma
 func (c *Client) GetNotifications() ([]Notification, error) {
-	// Use the cached notification data from the notificationList event
-	// Since we get this data automatically when connecting
-	c.notificationsMu.RLock()
-	cacheLength := len(c.notificationCache)
-	c.notificationsMu.RUnlock()
-
-	// If cache is empty, wait a bit for the notificationList event
-	if cacheLength == 0 {
-		time.Sleep(2 * time.Second)
+	// Force refresh to get latest data
+	err := c.RefreshNotifications()
+	if err != nil {
+		return nil, fmt.Errorf("failed to refresh notifications: %w", err)
 	}
 
 	c.notificationsMu.RLock()
