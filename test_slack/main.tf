@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     uptimekuma = {
-      source = "j0r15.local/provider/uptimekuma"
+      source = "ansible.local/provider/uptimekuma"
       version = "~> 1.0.0"
     }
   }
@@ -16,7 +16,7 @@ provider "uptimekuma" {
 # Simple Slack notification example
 resource "uptimekuma_notification" "slack" {
   name = "Slack Alerts"
-  type = "slack"
+  type = "Slack"
   config = {
     slackwebhookURL = var.slack_url
     slackchannel    = "#uptime"
@@ -34,6 +34,7 @@ resource "uptimekuma_monitor" "hosts" {
   interval = each.value.interval
   timeout  = each.value.timeout
   active   = each.value.active
+  accepted_status_codes = ["200-299", "403"]
   
   # Apply slack notification to all hosts
   notification_id_list = [

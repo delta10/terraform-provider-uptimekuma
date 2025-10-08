@@ -385,6 +385,16 @@ func (r *MonitorResource) Read(ctx context.Context, req resource.ReadRequest, re
 		data.BasicAuthPass = types.StringValue(monitor.BasicAuthPass)
 	}
 
+	// Convert accepted status codes to list
+	if len(monitor.AcceptedStatusCodes) > 0 {
+		listValue, diags := types.ListValueFrom(ctx, types.StringType, monitor.AcceptedStatusCodes)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		data.AcceptedStatusCodes = listValue
+	}
+
 	// Convert notification IDs to string list
 	if len(monitor.NotificationIDList) > 0 {
 		notificationIDs := make([]string, len(monitor.NotificationIDList))

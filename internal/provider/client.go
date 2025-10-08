@@ -586,6 +586,17 @@ func (c *Client) GetMonitor(id int) (*Monitor, error) {
 					monitor.BasicAuthPass = basicAuthPass
 				}
 
+				// Parse accepted_statuscodes
+				if statusCodes, ok := monitorMap["accepted_statuscodes"].([]interface{}); ok {
+					var codes []string
+					for _, codeInterface := range statusCodes {
+						if codeStr, ok := codeInterface.(string); ok {
+							codes = append(codes, codeStr)
+						}
+					}
+					monitor.AcceptedStatusCodes = codes
+				}
+
 				// Parse notification_id_list
 				if notificationIDs, ok := monitorMap["notification_id_list"].([]interface{}); ok {
 					var ids []int
@@ -710,6 +721,17 @@ func (c *Client) GetMonitors() ([]Monitor, error) {
 				monitor.BasicAuthPass = basicAuthPass
 			}
 
+			// Parse accepted_statuscodes
+			if statusCodes, ok := monitorMap["accepted_statuscodes"].([]interface{}); ok {
+				var codes []string
+				for _, codeInterface := range statusCodes {
+					if codeStr, ok := codeInterface.(string); ok {
+						codes = append(codes, codeStr)
+					}
+				}
+				monitor.AcceptedStatusCodes = codes
+			}
+
 			monitors = append(monitors, monitor)
 		}
 	}
@@ -719,6 +741,12 @@ func (c *Client) GetMonitors() ([]Monitor, error) {
 
 // CreateMonitor creates a new monitor using Socket.IO
 func (c *Client) CreateMonitor(monitor *Monitor) (*Monitor, error) {
+	// Set default accepted status codes if not provided
+	acceptedStatusCodes := monitor.AcceptedStatusCodes
+	if len(acceptedStatusCodes) == 0 {
+		acceptedStatusCodes = []string{"200-299"}
+	}
+
 	// Build monitor data in the format expected by Uptime Kuma
 	monitorData := map[string]interface{}{
 		"type":                 monitor.Type,
@@ -733,7 +761,7 @@ func (c *Client) CreateMonitor(monitor *Monitor) (*Monitor, error) {
 		"maxretries":           monitor.MaxRetries,
 		"upsideDown":           monitor.UpsideDown,
 		"maxredirects":         monitor.MaxRedirects,
-		"accepted_statuscodes": []string{"200-299"}, // Ensure this is always an array
+		"accepted_statuscodes": acceptedStatusCodes,
 		"method":               monitor.HTTPMethod,
 		"body":                 monitor.Body,
 		"headers":              "",
@@ -820,6 +848,12 @@ func (c *Client) CreateMonitor(monitor *Monitor) (*Monitor, error) {
 
 // UpdateMonitor updates an existing monitor
 func (c *Client) UpdateMonitor(monitor *Monitor) (*Monitor, error) {
+	// Set default accepted status codes if not provided
+	acceptedStatusCodes := monitor.AcceptedStatusCodes
+	if len(acceptedStatusCodes) == 0 {
+		acceptedStatusCodes = []string{"200-299"}
+	}
+
 	// Build monitor data in the format expected by Uptime Kuma (same as create)
 	monitorData := map[string]interface{}{
 		"id":                   monitor.ID,
@@ -835,7 +869,7 @@ func (c *Client) UpdateMonitor(monitor *Monitor) (*Monitor, error) {
 		"maxretries":           monitor.MaxRetries,
 		"upsideDown":           monitor.UpsideDown,
 		"maxredirects":         monitor.MaxRedirects,
-		"accepted_statuscodes": []string{"200-299"}, // Ensure this is always an array
+		"accepted_statuscodes": acceptedStatusCodes,
 		"method":               monitor.HTTPMethod,
 		"body":                 monitor.Body,
 		"headers":              "",
