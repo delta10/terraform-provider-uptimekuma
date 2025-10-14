@@ -597,8 +597,9 @@ func (c *Client) GetMonitor(id int) (*Monitor, error) {
 					monitor.AcceptedStatusCodes = codes
 				}
 
-				// Parse notification_id_list
+				// Parse notification_id_list - can be either array or map format
 				if notificationIDs, ok := monitorMap["notification_id_list"].([]interface{}); ok {
+					// Array format: ["1", "2", "3"] or [1, 2, 3]
 					var ids []int
 					for _, idInterface := range notificationIDs {
 						if idStr, ok := idInterface.(string); ok {
@@ -607,6 +608,24 @@ func (c *Client) GetMonitor(id int) (*Monitor, error) {
 							}
 						} else if idFloat, ok := idInterface.(float64); ok {
 							ids = append(ids, int(idFloat))
+						}
+					}
+					monitor.NotificationIDList = ids
+				} else if notificationIDMap, ok := monitorMap["notification_id_list"].(map[string]interface{}); ok {
+					// Map format: {"1": true, "2": true}
+					var ids []int
+					for idStr := range notificationIDMap {
+						if id, err := strconv.Atoi(idStr); err == nil {
+							ids = append(ids, id)
+						}
+					}
+					monitor.NotificationIDList = ids
+				} else if notificationIDMap, ok := monitorMap["notificationIDList"].(map[string]interface{}); ok {
+					// Alternative key format: notificationIDList instead of notification_id_list
+					var ids []int
+					for idStr := range notificationIDMap {
+						if id, err := strconv.Atoi(idStr); err == nil {
+							ids = append(ids, id)
 						}
 					}
 					monitor.NotificationIDList = ids

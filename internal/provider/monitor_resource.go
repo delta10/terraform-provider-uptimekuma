@@ -327,6 +327,12 @@ func (r *MonitorResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	// Refresh monitor data from the API to ensure we have the latest state
+	err = r.client.RefreshMonitors()
+	if err != nil {
+		tflog.Warn(ctx, fmt.Sprintf("Unable to refresh monitors: %s", err))
+	}
+
 	// Get monitor from API
 	monitor, err := r.client.GetMonitor(id)
 	if err != nil {
