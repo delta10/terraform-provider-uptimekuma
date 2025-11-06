@@ -216,21 +216,6 @@ func (r *MonitorResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	// Check if a monitor with this name already exists
-	existingMonitors, err := r.client.GetMonitors()
-	if err != nil {
-		tflog.Warn(ctx, fmt.Sprintf("Unable to check for existing monitors: %s", err))
-	}
-
-	var existingMonitor *Monitor
-	for i := range existingMonitors {
-		if existingMonitors[i].Name == data.Name.ValueString() {
-			existingMonitor = &existingMonitors[i]
-			tflog.Info(ctx, fmt.Sprintf("Found existing monitor with name '%s' and ID %d, adopting it", existingMonitor.Name, existingMonitor.ID))
-			break
-		}
-	}
-
 	// Convert Terraform model to API model
 	monitor := &Monitor{
 		Name:           data.Name.ValueString(),
@@ -277,25 +262,13 @@ func (r *MonitorResource) Create(ctx context.Context, req resource.CreateRequest
 		}
 	}
 
-	var createdMonitor *Monitor
-	if existingMonitor != nil {
-		// Adopt the existing monitor and update it
-		monitor.ID = existingMonitor.ID
-		createdMonitor, err = r.client.UpdateMonitor(monitor)
-		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update existing monitor, got error: %s", err))
-			return
-		}
-		tflog.Info(ctx, fmt.Sprintf("Adopted and updated existing monitor with ID %d", existingMonitor.ID))
-	} else {
-		// Create new monitor
-		createdMonitor, err = r.client.CreateMonitor(monitor)
-		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create monitor, got error: %s", err))
-			return
-		}
-		tflog.Info(ctx, fmt.Sprintf("Created new monitor with ID %d", createdMonitor.ID))
+	// Create new monitor
+	createdMonitor, err := r.client.CreateMonitor(monitor)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create monitor, got error: %s", err))
+		return
 	}
+	tflog.Info(ctx, fmt.Sprintf("Created new monitor with ID %d", createdMonitor.ID))
 
 	// Update the model with the created monitor ID
 	data.ID = types.StringValue(strconv.Itoa(createdMonitor.ID))
@@ -534,6 +507,12 @@ func (r *MonitorResource) Delete(ctx context.Context, req resource.DeleteRequest
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete monitor, got error: %s", err))
 		return
+	}
+
+	// Refresh the monitor cache to ensure the deleted monitor is removed
+	err = r.client.RefreshMonitors()
+	if err != nil {
+		tflog.Warn(ctx, fmt.Sprintf("Unable to refresh monitors after delete: %s", err))
 	}
 
 	// Write logs using the tflog package

@@ -951,11 +951,14 @@ func (c *Client) UpdateMonitor(monitor *Monitor) (*Monitor, error) {
 
 // DeleteMonitor deletes a monitor
 func (c *Client) DeleteMonitor(id int) error {
-	// Call "deleteMonitor" API endpoint
-	err := c.emit("deleteMonitor", id)
+	// Call "deleteMonitor" API endpoint and wait for confirmation
+	_, err := c.call("deleteMonitor", id)
 	if err != nil {
 		return fmt.Errorf("failed to delete monitor: %w", err)
 	}
+
+	// Wait a moment for the monitor to be removed from the cache
+	time.Sleep(500 * time.Millisecond)
 
 	return nil
 }
